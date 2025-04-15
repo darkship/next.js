@@ -22,6 +22,7 @@ mod path_visitor;
 pub mod references;
 pub mod runtime_functions;
 pub mod side_effect_optimization;
+pub mod simple_tree_shake;
 pub(crate) mod special_cases;
 pub(crate) mod static_code;
 mod swc_comments;
@@ -125,9 +126,9 @@ pub enum SpecifiedModuleType {
     Default,
     Serialize,
     Deserialize,
+    TaskInput,
     TraceRawVcs,
     NonLocalValue,
-    TaskInput,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum TreeShakingMode {
@@ -165,6 +166,8 @@ pub struct EcmascriptOptions {
     /// parsing fails. This is useful to keep the module graph structure intact when syntax errors
     /// are temporarily introduced.
     pub keep_last_successful_parse: bool,
+
+    pub unused_export_removal: bool,
 }
 
 #[turbo_tasks::value(serialization = "auto_for_input")]
@@ -808,6 +811,7 @@ pub struct EcmascriptModuleContent {
 #[turbo_tasks::value(shared)]
 #[derive(Clone, Debug, Hash, TaskInput)]
 pub struct EcmascriptModuleContentOptions {
+    module: ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>,
     parsed: ResolvedVc<ParseResult>,
     ident: ResolvedVc<AssetIdent>,
     specified_module_type: SpecifiedModuleType,
@@ -822,11 +826,13 @@ pub struct EcmascriptModuleContentOptions {
     original_source_map: Option<ResolvedVc<Box<dyn GenerateSourceMap>>>,
     exports: ResolvedVc<EcmascriptExports>,
     async_module_info: Option<ResolvedVc<AsyncModuleInfo>>,
+    unused_export_removal: bool,
 }
 
 impl EcmascriptModuleContentOptions {
     async fn merged_code_gens(&self) -> Result<Vec<CodeGeneration>> {
         let EcmascriptModuleContentOptions {
+            module,
             parsed,
             module_graph,
             chunking_context,
