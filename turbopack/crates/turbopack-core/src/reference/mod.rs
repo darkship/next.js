@@ -50,14 +50,13 @@ impl ModuleReferences {
 pub struct SingleModuleReference {
     asset: ResolvedVc<Box<dyn Module>>,
     description: ResolvedVc<RcStr>,
-    export: ExportUsage,
 }
 
 #[turbo_tasks::value_impl]
 impl ModuleReference for SingleModuleReference {
     #[turbo_tasks::function]
     fn resolve_reference(&self) -> Vc<ModuleResolveResult> {
-        *ModuleResolveResult::module(self.asset, self.export.clone())
+        *ModuleResolveResult::module(self.asset)
     }
 }
 
@@ -74,16 +73,8 @@ impl SingleModuleReference {
     /// Create a new [Vc<SingleModuleReference>] that resolves to the given
     /// asset.
     #[turbo_tasks::function]
-    pub fn new(
-        asset: ResolvedVc<Box<dyn Module>>,
-        description: ResolvedVc<RcStr>,
-        export: ExportUsage,
-    ) -> Vc<Self> {
-        Self::cell(SingleModuleReference {
-            asset,
-            description,
-            export,
-        })
+    pub fn new(asset: ResolvedVc<Box<dyn Module>>, description: ResolvedVc<RcStr>) -> Vc<Self> {
+        Self::cell(SingleModuleReference { asset, description })
     }
 
     /// The [Vc<Box<dyn Asset>>] that this reference resolves to.
@@ -97,7 +88,7 @@ impl SingleModuleReference {
 pub struct SingleChunkableModuleReference {
     asset: ResolvedVc<Box<dyn Module>>,
     description: ResolvedVc<RcStr>,
-    export: ExportUsage,
+    export: ResolvedVc<ExportUsage>,
 }
 
 #[turbo_tasks::value_impl]
@@ -106,7 +97,7 @@ impl SingleChunkableModuleReference {
     pub fn new(
         asset: ResolvedVc<Box<dyn Module>>,
         description: ResolvedVc<RcStr>,
-        export: ExportUsage,
+        export: ResolvedVc<ExportUsage>,
     ) -> Vc<Self> {
         Self::cell(SingleChunkableModuleReference {
             asset,
@@ -125,13 +116,18 @@ impl ChunkableModuleReference for SingleChunkableModuleReference {
             hoisted: false,
         }))
     }
+
+    #[turbo_tasks::function]
+    fn export_usage(&self) -> Vc<ExportUsage> {
+        *self.export
+    }
 }
 
 #[turbo_tasks::value_impl]
 impl ModuleReference for SingleChunkableModuleReference {
     #[turbo_tasks::function]
     fn resolve_reference(&self) -> Vc<ModuleResolveResult> {
-        *ModuleResolveResult::module(self.asset, self.export.clone())
+        *ModuleResolveResult::module(self.asset)
     }
 }
 
@@ -231,7 +227,7 @@ pub struct TracedModuleReference {
 impl ModuleReference for TracedModuleReference {
     #[turbo_tasks::function]
     fn resolve_reference(&self) -> Vc<ModuleResolveResult> {
-        *ModuleResolveResult::module(self.module, ExportUsage::All)
+        *ModuleResolveResult::module(self.module)
     }
 }
 
@@ -250,6 +246,11 @@ impl ChunkableModuleReference for TracedModuleReference {
     #[turbo_tasks::function]
     fn chunking_type(&self) -> Vc<ChunkingTypeOption> {
         Vc::cell(Some(ChunkingType::Traced))
+    }
+
+    #[turbo_tasks::function]
+    fn export_usage(&self) -> Vc<ExportUsage> {
+        ExportUsage::all()
     }
 }
 
@@ -322,7 +323,7 @@ pub async fn primary_chunkable_referenced_modules(
 
                     let resolved = result.primary_modules().owned().await?;
 
-                    let export = result.await?.export.clone();
+                    let export = (*reference.export_usage().await?).clone();
 
                     return Ok(Some((chunking_type.clone(), export, resolved)));
                 }
