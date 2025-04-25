@@ -167,7 +167,7 @@ pub struct EcmascriptOptions {
     /// are temporarily introduced.
     pub keep_last_successful_parse: bool,
 
-    pub unused_export_removal: bool,
+    pub remove_unused_exports: bool,
 }
 
 #[turbo_tasks::value(serialization = "auto_for_input")]
@@ -826,7 +826,7 @@ pub struct EcmascriptModuleContentOptions {
     original_source_map: Option<ResolvedVc<Box<dyn GenerateSourceMap>>>,
     exports: ResolvedVc<EcmascriptExports>,
     async_module_info: Option<ResolvedVc<AsyncModuleInfo>>,
-    unused_export_removal: bool,
+    remove_unused_exports: bool,
 }
 
 impl EcmascriptModuleContentOptions {
