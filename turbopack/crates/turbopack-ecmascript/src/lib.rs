@@ -870,7 +870,7 @@ impl EcmascriptModuleContentOptions {
                             .code_generation(
                                 **module_graph,
                                 **chunking_context,
-                                *self.module,
+                                *module,
                                 Some(**parsed),
                                 *remove_unused_exports,
                             )
