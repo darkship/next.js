@@ -125,6 +125,8 @@ impl EcmascriptAnalyzable for EcmascriptModuleLocalsModule {
             original_source_map: analyze_result.source_map,
             exports,
             async_module_info,
+            module: ResolvedVc::upcast(original_module),
+            remove_unused_exports: original_module.options().await?.remove_unused_exports,
         }
         .cell())
     }

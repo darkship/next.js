@@ -111,6 +111,8 @@ impl EcmascriptAnalyzable for EcmascriptModulePartAsset {
             original_source_map: analyze_ref.source_map,
             exports: analyze_ref.exports,
             async_module_info,
+            module: ResolvedVc::upcast(module.full_module),
+            remove_unused_exports: module.full_module.options().await?.remove_unused_exports,
         }
         .cell())
     }

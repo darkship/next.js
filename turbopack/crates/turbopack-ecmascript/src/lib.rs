@@ -432,7 +432,7 @@ impl EcmascriptAnalyzable for EcmascriptModuleAsset {
 
     #[turbo_tasks::function]
     async fn module_content_options(
-        self: Vc<Self>,
+        self: ResolvedVc<Self>,
         module_graph: ResolvedVc<ModuleGraph>,
         chunking_context: ResolvedVc<Box<dyn ChunkingContext>>,
         async_module_info: Option<ResolvedVc<AsyncModuleInfo>>,
@@ -444,7 +444,7 @@ impl EcmascriptAnalyzable for EcmascriptModuleAsset {
 
         let module_type_result = *self.determine_module_type().await?;
         let generate_source_map = *chunking_context
-            .reference_module_source_maps(Vc::upcast(self))
+            .reference_module_source_maps(Vc::upcast(*self))
             .await?;
 
         Ok(EcmascriptModuleContentOptions {
@@ -462,6 +462,8 @@ impl EcmascriptAnalyzable for EcmascriptModuleAsset {
             original_source_map: analyze_ref.source_map,
             exports: analyze_ref.exports,
             async_module_info,
+            module: ResolvedVc::upcast(self),
+            remove_unused_exports: self.options().await?.remove_unused_exports,
         }
         .cell())
     }
@@ -843,6 +845,7 @@ impl EcmascriptModuleContentOptions {
             async_module,
             exports,
             async_module_info,
+            remove_unused_exports,
             ..
         } = self;
 
@@ -864,7 +867,13 @@ impl EcmascriptModuleContentOptions {
                 if let EcmascriptExports::EsmExports(exports) = *exports.await? {
                     Some(
                         exports
-                            .code_generation(**module_graph, **chunking_context, Some(**parsed))
+                            .code_generation(
+                                **module_graph,
+                                **chunking_context,
+                                *self.module,
+                                Some(**parsed),
+                                *remove_unused_exports,
+                            )
                             .await?,
                     )
                 } else {
