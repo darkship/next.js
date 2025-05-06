@@ -2722,8 +2722,7 @@ export default async function build(
                     _isDynamicError: isDynamicError,
                     _isAppDir: true,
                     _isRoutePPREnabled: isRoutePPREnabled,
-                    _doNotThrowOnEmptyStaticShell:
-                      !route.throwOnEmptyStaticShell,
+                    _allowEmptyStaticShell: !route.throwOnEmptyStaticShell,
                   }
                 })
               })
