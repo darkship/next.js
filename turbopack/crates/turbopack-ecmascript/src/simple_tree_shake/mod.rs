@@ -41,9 +41,7 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
             {
                 let e = used_exports.entry(target_module).or_default();
 
-                for export in ref_data.exports.iter() {
-                    e.add(export);
-                }
+                e.add(&ref_data.export);
             }
 
             Ok(())

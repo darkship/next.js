@@ -197,7 +197,7 @@ pub struct SingleModuleGraph {
 )]
 pub struct RefData {
     pub chunking_type: ChunkingType,
-    pub exports: Vec<ExportUsage>,
+    pub export: ExportUsage,
 }
 
 impl SingleModuleGraph {
@@ -215,7 +215,7 @@ impl SingleModuleGraph {
             .map(|e| async move {
                 Ok(SingleModuleGraphBuilderEdge {
                     to: SingleModuleGraphBuilderNode::new_module(e).await?,
-                    exports: vec![ExportUsage::All],
+                    export: ExportUsage::All,
                 })
             })
             .try_join()
@@ -248,13 +248,13 @@ impl SingleModuleGraph {
             FxHashMap::with_capacity_and_hasher(node_count, Default::default());
         {
             let _span = tracing::info_span!("build module graph").entered();
-            for (parent, current) in children_nodes_iter.into_breadth_first_edges() {
-                let parent_edge = match parent {
+            for (parent, (current, export)) in children_nodes_iter.into_breadth_first_edges() {
+                let parent_edge = match parent.map(|v| v.0) {
                     Some(SingleModuleGraphBuilderNode::Module { module, .. }) => Some((
                         *modules.get(&module).unwrap(),
                         RefData {
                             chunking_type: COMMON_CHUNKING_TYPE,
-                            exports: vec![],
+                            export,
                         },
                     )),
                     Some(SingleModuleGraphBuilderNode::ChunkableReference { .. }) => {
@@ -1338,7 +1338,7 @@ impl SingleModuleGraphBuilderNode {
 }
 struct SingleModuleGraphBuilderEdge {
     to: SingleModuleGraphBuilderNode,
-    exports: Vec<ExportUsage>,
+    export: ExportUsage,
 }
 
 /// The chunking type that occurs most often, is handled more efficiently by not creating
@@ -1353,34 +1353,46 @@ struct SingleModuleGraphBuilder<'a> {
     /// Whether to walk ChunkingType::Traced references
     include_traced: bool,
 }
-impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
+impl Visit<(SingleModuleGraphBuilderNode, ExportUsage)> for SingleModuleGraphBuilder<'_> {
     type Edge = SingleModuleGraphBuilderEdge;
     type EdgesIntoIter = Vec<Self::Edge>;
     type EdgesFuture = impl Future<Output = Result<Self::EdgesIntoIter>>;
 
-    fn visit(&mut self, edge: Self::Edge) -> VisitControlFlow<SingleModuleGraphBuilderNode> {
+    fn visit(
+        &mut self,
+        edge: Self::Edge,
+    ) -> VisitControlFlow<(SingleModuleGraphBuilderNode, ExportUsage)> {
         match edge.to {
-            SingleModuleGraphBuilderNode::Module { .. } => VisitControlFlow::Continue(edge.to),
+            SingleModuleGraphBuilderNode::Module { .. } => {
+                VisitControlFlow::Continue((edge.to, edge.export))
+            }
             SingleModuleGraphBuilderNode::ChunkableReference { ref ref_data, .. } => {
                 match &ref_data.chunking_type {
-                    ChunkingType::Traced => VisitControlFlow::Skip(edge.to),
-                    _ => VisitControlFlow::Continue(edge.to),
+                    ChunkingType::Traced => VisitControlFlow::Skip((edge.to, edge.export)),
+                    _ => VisitControlFlow::Continue((edge.to, edge.export)),
                 }
             }
             // Module was already visited previously
-            SingleModuleGraphBuilderNode::VisitedModule { .. } => VisitControlFlow::Skip(edge.to),
+            SingleModuleGraphBuilderNode::VisitedModule { .. } => {
+                VisitControlFlow::Skip((edge.to, edge.export))
+            }
             // Issues doen't have any children
-            SingleModuleGraphBuilderNode::Issues(_) => VisitControlFlow::Skip(edge.to),
+            SingleModuleGraphBuilderNode::Issues(_) => {
+                VisitControlFlow::Skip((edge.to, edge.export))
+            }
         }
     }
 
-    fn edges(&mut self, node: &SingleModuleGraphBuilderNode) -> Self::EdgesFuture {
+    fn edges(
+        &mut self,
+        (node, _): &(SingleModuleGraphBuilderNode, ExportUsage),
+    ) -> Self::EdgesFuture {
         // Destructure beforehand to not have to clone the whole node when entering the async block
         let (module, chunkable_ref_target) = match node {
             SingleModuleGraphBuilderNode::Module { module, .. } => (Some(*module), None),
             SingleModuleGraphBuilderNode::ChunkableReference {
                 target, ref_data, ..
-            } => (None, Some((*target, ref_data.exports.clone()))),
+            } => (None, Some((*target, ref_data.export.clone()))),
             // These are always skipped in `visit()`
             SingleModuleGraphBuilderNode::VisitedModule { .. }
             | SingleModuleGraphBuilderNode::Issues(_) => unreachable!(),
@@ -1422,20 +1434,17 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                                     target,
                                     RefData {
                                         chunking_type: ty,
-                                        exports: vec![export.clone()],
+                                        export: export.clone(),
                                     },
                                 )
                                 .await?
                             };
-                            Ok(SingleModuleGraphBuilderEdge {
-                                to,
-                                exports: vec![export],
-                            })
+                            Ok(SingleModuleGraphBuilderEdge { to, export })
                         })
                         .try_join()
                         .await?
                 }
-                (None, Some((chunkable_ref_target, exports))) => {
+                (None, Some((chunkable_ref_target, export))) => {
                     vec![SingleModuleGraphBuilderEdge {
                         to: if let Some(idx) = visited_modules.get(&chunkable_ref_target) {
                             SingleModuleGraphBuilderNode::new_visited_module(
@@ -1445,7 +1454,7 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                         } else {
                             SingleModuleGraphBuilderNode::new_module(chunkable_ref_target).await?
                         },
-                        exports,
+                        export,
                     }]
                 }
                 _ => unreachable!(),
@@ -1453,7 +1462,7 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
         }
     }
 
-    fn span(&mut self, node: &SingleModuleGraphBuilderNode) -> tracing::Span {
+    fn span(&mut self, (node, _): &(SingleModuleGraphBuilderNode, ExportUsage)) -> tracing::Span {
         match node {
             SingleModuleGraphBuilderNode::Module { ident, .. } => {
                 tracing::info_span!("module", name = display(ident))
