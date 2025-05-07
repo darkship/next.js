@@ -11,7 +11,7 @@ use turbopack_core::{
     module::Module,
     module_graph::ModuleGraph,
     reference::{ModuleReference, ModuleReferences},
-    resolve::{ExportUsage, ModuleResolveResult},
+    resolve::ModuleResolveResult,
 };
 
 use super::chunk_item::WorkerLoaderChunkItem;

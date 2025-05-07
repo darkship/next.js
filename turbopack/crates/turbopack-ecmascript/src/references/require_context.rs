@@ -31,7 +31,7 @@ use turbopack_core::{
     module::Module,
     module_graph::ModuleGraph,
     reference::{ModuleReference, ModuleReferences},
-    resolve::{origin::ResolveOrigin, parse::Request, ExportUsage, ModuleResolveResult},
+    resolve::{origin::ResolveOrigin, parse::Request, ModuleResolveResult},
     source::Source,
 };
 use turbopack_resolve::ecmascript::cjs_resolve;

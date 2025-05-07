@@ -17,9 +17,7 @@ use turbopack_core::{
     module_graph::ModuleGraph,
     reference::ModuleReference,
     reference_type::{ReferenceType, WorkerReferenceSubType},
-    resolve::{
-        origin::ResolveOrigin, parse::Request, url_resolve, ExportUsage, ModuleResolveResult,
-    },
+    resolve::{origin::ResolveOrigin, parse::Request, url_resolve, ModuleResolveResult},
 };
 
 use crate::{

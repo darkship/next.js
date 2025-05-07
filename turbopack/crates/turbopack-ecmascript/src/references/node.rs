@@ -10,7 +10,7 @@ use turbopack_core::{
     reference::ModuleReference,
     resolve::{
         pattern::{read_matches, Pattern, PatternMatch},
-        ExportUsage, ModuleResolveResult, RequestKey,
+        ModuleResolveResult, RequestKey,
     },
     source::Source,
 };

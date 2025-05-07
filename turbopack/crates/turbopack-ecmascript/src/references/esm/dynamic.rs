@@ -20,7 +20,7 @@ use turbopack_core::{
     resolve::{
         origin::{ResolveOrigin, ResolveOriginExt},
         parse::Request,
-        ExportUsage, ModuleResolveResult,
+        ModuleResolveResult,
     },
 };
 use turbopack_resolve::ecmascript::esm_resolve;

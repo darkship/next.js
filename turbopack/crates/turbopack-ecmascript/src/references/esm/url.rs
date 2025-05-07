@@ -20,8 +20,7 @@ use turbopack_core::{
     reference::ModuleReference,
     reference_type::{ReferenceType, UrlReferenceSubType},
     resolve::{
-        origin::ResolveOrigin, parse::Request, url_resolve, ExportUsage, ExternalType,
-        ModuleResolveResult,
+        origin::ResolveOrigin, parse::Request, url_resolve, ExternalType, ModuleResolveResult,
     },
 };
 

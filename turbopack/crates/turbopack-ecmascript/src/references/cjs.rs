@@ -14,7 +14,7 @@ use turbopack_core::{
     issue::IssueSource,
     module_graph::ModuleGraph,
     reference::ModuleReference,
-    resolve::{origin::ResolveOrigin, parse::Request, ExportUsage, ModuleResolveResult},
+    resolve::{origin::ResolveOrigin, parse::Request, ModuleResolveResult},
 };
 use turbopack_resolve::ecmascript::cjs_resolve;
 

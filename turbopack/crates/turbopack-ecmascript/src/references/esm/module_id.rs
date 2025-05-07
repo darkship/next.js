@@ -9,7 +9,7 @@ use turbopack_core::{
     chunk::{ChunkableModuleReference, ChunkingContext, ChunkingTypeOption, ModuleChunkItemIdExt},
     module_graph::ModuleGraph,
     reference::ModuleReference,
-    resolve::{ExportUsage, ModuleResolveResult},
+    resolve::ModuleResolveResult,
 };
 
 use super::{base::ReferencedAsset, EsmAssetReference};
