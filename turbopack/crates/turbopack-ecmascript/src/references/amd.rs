@@ -85,12 +85,7 @@ impl ValueToString for AmdDefineAssetReference {
 }
 
 #[turbo_tasks::value_impl]
-impl ChunkableModuleReference for AmdDefineAssetReference {
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
-}
+impl ChunkableModuleReference for AmdDefineAssetReference {}
 
 #[derive(
     ValueDebugFormat,

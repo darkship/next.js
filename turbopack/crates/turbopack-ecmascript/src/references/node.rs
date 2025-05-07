@@ -165,11 +165,6 @@ impl ChunkableModuleReference for DirAssetReference {
     fn chunking_type(&self) -> Vc<ChunkingTypeOption> {
         Vc::cell(Some(ChunkingType::Traced))
     }
-
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
 }
 
 #[turbo_tasks::value_impl]

@@ -56,11 +56,6 @@ impl ChunkableModuleReference for EsmModuleIdAssetReference {
     fn chunking_type(&self) -> Vc<ChunkingTypeOption> {
         self.inner.chunking_type()
     }
-
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
 }
 
 impl IntoCodeGenReference for EsmModuleIdAssetReference {

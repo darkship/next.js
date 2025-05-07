@@ -113,12 +113,7 @@ impl ValueToString for WorkerAssetReference {
 }
 
 #[turbo_tasks::value_impl]
-impl ChunkableModuleReference for WorkerAssetReference {
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
-}
+impl ChunkableModuleReference for WorkerAssetReference {}
 
 impl IntoCodeGenReference for WorkerAssetReference {
     fn into_code_gen_reference(

@@ -105,11 +105,6 @@ impl ChunkableModuleReference for EsmAsyncAssetReference {
     fn chunking_type(&self) -> Vc<ChunkingTypeOption> {
         Vc::cell(Some(ChunkingType::Async))
     }
-
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
 }
 
 impl IntoCodeGenReference for EsmAsyncAssetReference {

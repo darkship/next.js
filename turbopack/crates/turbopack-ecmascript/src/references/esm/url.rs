@@ -133,11 +133,6 @@ impl ChunkableModuleReference for UrlAssetReference {
             hoisted: false,
         }))
     }
-
-    #[turbo_tasks::function]
-    fn export_usage(&self) -> Vc<ExportUsage> {
-        ExportUsage::all()
-    }
 }
 
 impl IntoCodeGenReference for UrlAssetReference {
