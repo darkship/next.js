@@ -85,14 +85,3 @@ impl ModuleExportUsageInfo {
             || self.exports.contains(&ExportUsage::Named(export_name))
     }
 }
-
-#[turbo_tasks::value_impl]
-impl ModuleExportUsageInfo {
-    #[turbo_tasks::function]
-    pub fn all() -> Vc<Self> {
-        let mut exports = AutoSet::with_capacity(1);
-        exports.insert(ExportUsage::All);
-
-        Self { exports }.cell()
-    }
-}
