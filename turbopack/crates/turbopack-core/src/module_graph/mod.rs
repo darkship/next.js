@@ -197,7 +197,7 @@ pub struct SingleModuleGraph {
 )]
 pub struct RefData {
     pub chunking_type: ChunkingType,
-    pub export: ExportUsage,
+    pub exports: Vec<ExportUsage>,
 }
 
 impl SingleModuleGraph {
@@ -215,7 +215,7 @@ impl SingleModuleGraph {
             .map(|e| async move {
                 Ok(SingleModuleGraphBuilderEdge {
                     to: SingleModuleGraphBuilderNode::new_module(e).await?,
-                    export: ExportUsage::All,
+                    exports: vec![ExportUsage::All],
                 })
             })
             .try_join()
@@ -254,7 +254,7 @@ impl SingleModuleGraph {
                         *modules.get(&module).unwrap(),
                         RefData {
                             chunking_type: COMMON_CHUNKING_TYPE,
-                            export,
+                            exports: vec![],
                         },
                     )),
                     Some(SingleModuleGraphBuilderNode::ChunkableReference { .. }) => {
@@ -1338,7 +1338,7 @@ impl SingleModuleGraphBuilderNode {
 }
 struct SingleModuleGraphBuilderEdge {
     to: SingleModuleGraphBuilderNode,
-    export: ExportUsage,
+    exports: Vec<ExportUsage>,
 }
 
 /// The chunking type that occurs most often, is handled more efficiently by not creating
@@ -1378,9 +1378,9 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
         // Destructure beforehand to not have to clone the whole node when entering the async block
         let (module, chunkable_ref_target) = match node {
             SingleModuleGraphBuilderNode::Module { module, .. } => (Some(*module), None),
-            SingleModuleGraphBuilderNode::ChunkableReference { target, .. } => {
-                (None, Some(*target))
-            }
+            SingleModuleGraphBuilderNode::ChunkableReference {
+                target, ref_data, ..
+            } => (None, Some((*target, ref_data.exports.clone()))),
             // These are always skipped in `visit()`
             SingleModuleGraphBuilderNode::VisitedModule { .. }
             | SingleModuleGraphBuilderNode::Issues(_) => unreachable!(),
@@ -1422,17 +1422,20 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                                     target,
                                     RefData {
                                         chunking_type: ty,
-                                        export,
+                                        exports: vec![export.clone()],
                                     },
                                 )
                                 .await?
                             };
-                            Ok(SingleModuleGraphBuilderEdge { to, export })
+                            Ok(SingleModuleGraphBuilderEdge {
+                                to,
+                                exports: vec![export],
+                            })
                         })
                         .try_join()
                         .await?
                 }
-                (None, Some(chunkable_ref_target)) => {
+                (None, Some((chunkable_ref_target, exports))) => {
                     vec![SingleModuleGraphBuilderEdge {
                         to: if let Some(idx) = visited_modules.get(&chunkable_ref_target) {
                             SingleModuleGraphBuilderNode::new_visited_module(
@@ -1442,7 +1445,7 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                         } else {
                             SingleModuleGraphBuilderNode::new_module(chunkable_ref_target).await?
                         },
-                        export,
+                        exports,
                     }]
                 }
                 _ => unreachable!(),
