@@ -214,7 +214,8 @@ impl SingleModuleGraph {
             .flat_map(|e| e.entries())
             .map(|e| async move {
                 Ok(SingleModuleGraphBuilderEdge {
-                    to: SingleModuleGraphBuilderNode::new_module(e, ExportUsage::All).await?,
+                    to: SingleModuleGraphBuilderNode::new_module(e).await?,
+                    export: ExportUsage::All,
                 })
             })
             .try_join()
@@ -249,7 +250,7 @@ impl SingleModuleGraph {
             let _span = tracing::info_span!("build module graph").entered();
             for (parent, current) in children_nodes_iter.into_breadth_first_edges() {
                 let parent_edge = match parent {
-                    Some(SingleModuleGraphBuilderNode::Module { module, export, .. }) => Some((
+                    Some(SingleModuleGraphBuilderNode::Module { module, .. }) => Some((
                         *modules.get(&module).unwrap(),
                         RefData {
                             chunking_type: COMMON_CHUNKING_TYPE,
@@ -272,7 +273,6 @@ impl SingleModuleGraph {
                         module,
                         layer,
                         ident: _,
-                        export,
                     } => {
                         // Find the current node, if it was already added
                         let current_idx = if let Some(current_idx) = modules.get(&module) {
@@ -291,14 +291,10 @@ impl SingleModuleGraph {
                         };
                         // Add the edge
                         if let Some((parent_idx, ref_data)) = parent_edge {
-                            graph.add_edge(parent_idx, current_idx, RefData { export, ..ref_data });
+                            graph.add_edge(parent_idx, current_idx, ref_data);
                         }
                     }
-                    SingleModuleGraphBuilderNode::VisitedModule {
-                        module,
-                        idx,
-                        export,
-                    } => {
+                    SingleModuleGraphBuilderNode::VisitedModule { module, idx } => {
                         // Find the current node, if it was already added
                         let current_idx = if let Some(current_idx) = modules.get(&module) {
                             *current_idx
@@ -310,14 +306,6 @@ impl SingleModuleGraph {
                         };
                         // Add the edge
                         if let Some((parent_idx, data)) = parent_edge {
-                            graph.add_edge(
-                                parent_idx,
-                                current_idx,
-                                RefData {
-                                    export,
-                                    ..data.clone()
-                                },
-                            );
                             graph.add_edge(parent_idx, current_idx, data);
                         }
                     }
@@ -1316,7 +1304,7 @@ enum SingleModuleGraphBuilderNode {
 }
 
 impl SingleModuleGraphBuilderNode {
-    async fn new_module(module: ResolvedVc<Box<dyn Module>>, export: ExportUsage) -> Result<Self> {
+    async fn new_module(module: ResolvedVc<Box<dyn Module>>) -> Result<Self> {
         let ident = module.ident();
         Ok(Self::Module {
             module,
@@ -1325,7 +1313,6 @@ impl SingleModuleGraphBuilderNode {
                 None => None,
             },
             ident: ident.to_string().await?,
-            export,
         })
     }
     async fn new_chunkable_ref(
@@ -1345,20 +1332,13 @@ impl SingleModuleGraphBuilderNode {
             },
         })
     }
-    fn new_visited_module(
-        module: ResolvedVc<Box<dyn Module>>,
-        idx: GraphNodeIndex,
-        export: ExportUsage,
-    ) -> Self {
-        Self::VisitedModule {
-            module,
-            idx,
-            export,
-        }
+    fn new_visited_module(module: ResolvedVc<Box<dyn Module>>, idx: GraphNodeIndex) -> Self {
+        Self::VisitedModule { module, idx }
     }
 }
 struct SingleModuleGraphBuilderEdge {
     to: SingleModuleGraphBuilderNode,
+    export: ExportUsage,
 }
 
 /// The chunking type that occurs most often, is handled more efficiently by not creating
@@ -1396,13 +1376,11 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
 
     fn edges(&mut self, node: &SingleModuleGraphBuilderNode) -> Self::EdgesFuture {
         // Destructure beforehand to not have to clone the whole node when entering the async block
-        let (module, chunkable_ref_target, export) = match node {
-            SingleModuleGraphBuilderNode::Module { module, export, .. } => {
-                (Some(*module), None, export.clone())
+        let (module, chunkable_ref_target) = match node {
+            SingleModuleGraphBuilderNode::Module { module, .. } => (Some(*module), None),
+            SingleModuleGraphBuilderNode::ChunkableReference { target, .. } => {
+                (None, Some(*target))
             }
-            SingleModuleGraphBuilderNode::ChunkableReference {
-                target, ref_data, ..
-            } => (None, Some(*target), ref_data.export.clone()),
             // These are always skipped in `visit()`
             SingleModuleGraphBuilderNode::VisitedModule { .. }
             | SingleModuleGraphBuilderNode::Issues(_) => unreachable!(),
@@ -1434,11 +1412,9 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                         .map(async |(ty, export, target)| {
                             let to = if ty == COMMON_CHUNKING_TYPE {
                                 if let Some(idx) = visited_modules.get(&target) {
-                                    SingleModuleGraphBuilderNode::new_visited_module(
-                                        target, *idx, export,
-                                    )
+                                    SingleModuleGraphBuilderNode::new_visited_module(target, *idx)
                                 } else {
-                                    SingleModuleGraphBuilderNode::new_module(target, export).await?
+                                    SingleModuleGraphBuilderNode::new_module(target).await?
                                 }
                             } else {
                                 SingleModuleGraphBuilderNode::new_chunkable_ref(
@@ -1451,7 +1427,7 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                                 )
                                 .await?
                             };
-                            Ok(SingleModuleGraphBuilderEdge { to })
+                            Ok(SingleModuleGraphBuilderEdge { to, export })
                         })
                         .try_join()
                         .await?
@@ -1462,12 +1438,11 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                             SingleModuleGraphBuilderNode::new_visited_module(
                                 chunkable_ref_target,
                                 *idx,
-                                export,
                             )
                         } else {
-                            SingleModuleGraphBuilderNode::new_module(chunkable_ref_target, export)
-                                .await?
+                            SingleModuleGraphBuilderNode::new_module(chunkable_ref_target).await?
                         },
+                        export,
                     }]
                 }
                 _ => unreachable!(),
