@@ -12,7 +12,7 @@ import stripAnsi from 'strip-ansi'
 
 const isExperimentalReact = process.env.__NEXT_EXPERIMENTAL_PPR
 
-const expectedErrorMessage =
+const expectedTimeoutErrorMessage =
   'Filling a cache during prerender timed out, likely because request-specific arguments such as params, searchParams, cookies() or dynamic data were used inside "use cache".'
 
 describe('use-cache-hanging-inputs', () => {
@@ -41,7 +41,7 @@ describe('use-cache-hanging-inputs', () => {
         const errorDescription = await getRedboxDescription(browser)
         const errorSource = await getRedboxSource(browser)
 
-        expect(errorDescription).toBe(expectedErrorMessage)
+        expect(errorDescription).toBe(expectedTimeoutErrorMessage)
 
         const cliOutput = stripAnsi(next.cliOutput.slice(outputIndex))
 
@@ -52,7 +52,7 @@ describe('use-cache-hanging-inputs', () => {
 
           expect(errorSource).toBe(null)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at [project]/app/search-params/page.tsx [app-rsc] (ecmascript)`)
         } else {
           expect(errorSource).toMatchInlineSnapshot(`
@@ -67,7 +67,7 @@ describe('use-cache-hanging-inputs', () => {
              6 |   searchParams: Promise<{ n: string }>"
           `)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at eval (app/search-params/page.tsx:3:15)`)
         }
       }, 180_000)
@@ -82,7 +82,7 @@ describe('use-cache-hanging-inputs', () => {
 
         const cliOutput = stripAnsi(next.cliOutput.slice(outputIndex))
 
-        expect(cliOutput).not.toContain(`Error: ${expectedErrorMessage}`)
+        expect(cliOutput).not.toContain(`Error: ${expectedTimeoutErrorMessage}`)
       })
     })
 
@@ -100,7 +100,7 @@ describe('use-cache-hanging-inputs', () => {
         const errorDescription = await getRedboxDescription(browser)
         const errorSource = await getRedboxSource(browser)
 
-        expect(errorDescription).toBe(expectedErrorMessage)
+        expect(errorDescription).toBe(expectedTimeoutErrorMessage)
 
         const cliOutput = stripAnsi(next.cliOutput.slice(outputIndex))
 
@@ -111,7 +111,7 @@ describe('use-cache-hanging-inputs', () => {
 
           expect(errorSource).toBe(null)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at [project]/app/uncached-promise/page.tsx [app-rsc] (ecmascript)`)
         } else {
           expect(errorSource).toMatchInlineSnapshot(`
@@ -126,7 +126,7 @@ describe('use-cache-hanging-inputs', () => {
              13 |   return ("
           `)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at eval (app/uncached-promise/page.tsx:10:12)`)
         }
       }, 180_000)
@@ -146,7 +146,7 @@ describe('use-cache-hanging-inputs', () => {
         const errorDescription = await getRedboxDescription(browser)
         const errorSource = await getRedboxSource(browser)
 
-        expect(errorDescription).toBe(expectedErrorMessage)
+        expect(errorDescription).toBe(expectedTimeoutErrorMessage)
 
         const cliOutput = stripAnsi(next.cliOutput.slice(outputIndex))
 
@@ -157,7 +157,7 @@ describe('use-cache-hanging-inputs', () => {
 
           expect(errorSource).toBe(null)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at [project]/app/uncached-promise-nested/page.tsx [app-rsc] (ecmascript)`)
         } else {
           expect(errorSource).toMatchInlineSnapshot(`
@@ -172,7 +172,7 @@ describe('use-cache-hanging-inputs', () => {
              19 |   return getCachedData(promise)"
           `)
 
-          expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+          expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at eval (app/uncached-promise-nested/page.tsx:16:0)`)
         }
       }, 180_000)
@@ -210,7 +210,7 @@ describe('use-cache-hanging-inputs', () => {
     at Page [Server] (<anonymous>)`
           )
         } else {
-          expect(errorDescription).toBe(expectedErrorMessage)
+          expect(errorDescription).toBe(expectedTimeoutErrorMessage)
 
           if (isTurbopack) {
             // TODO(veil): For Turbopack, a fix in the React Flight Client, where
@@ -219,7 +219,7 @@ describe('use-cache-hanging-inputs', () => {
 
             expect(errorSource).toBe(null)
 
-            expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+            expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at [project]/app/bound-args/page.tsx [app-rsc] (ecmascript)`)
           } else {
             expect(errorSource).toMatchInlineSnapshot(`
@@ -234,7 +234,7 @@ describe('use-cache-hanging-inputs', () => {
                16 |     return ("
             `)
 
-            expect(cliOutput).toContain(`Error: ${expectedErrorMessage}
+            expect(cliOutput).toContain(`Error: ${expectedTimeoutErrorMessage}
     at eval (app/bound-args/page.tsx:13:14)`)
           }
         }
@@ -262,23 +262,37 @@ describe('use-cache-hanging-inputs', () => {
     it('should fail the build with errors after a timeout', async () => {
       const { cliOutput } = await next.build()
 
-      expect(cliOutput).toInclude(`Error: ${expectedErrorMessage}`)
-
       expect(cliOutput).toInclude(
-        'Error occurred prerendering page "/bound-args"'
+        createExpectedBuildErrorMessage('/error', 'kaputt!')
       )
 
       expect(cliOutput).toInclude(
-        'Error occurred prerendering page "/search-params"'
+        createExpectedBuildErrorMessage('/bound-args')
       )
 
       expect(cliOutput).toInclude(
-        'Error occurred prerendering page "/uncached-promise"'
+        createExpectedBuildErrorMessage('/fallback-params/[slug]')
       )
 
       expect(cliOutput).toInclude(
-        'Error occurred prerendering page "/uncached-promise-nested"'
+        createExpectedBuildErrorMessage('/search-params')
+      )
+
+      expect(cliOutput).toInclude(
+        createExpectedBuildErrorMessage('/uncached-promise')
+      )
+
+      expect(cliOutput).toInclude(
+        createExpectedBuildErrorMessage('/uncached-promise-nested')
       )
     }, 180_000)
   }
 })
+
+function createExpectedBuildErrorMessage(
+  pathname: string,
+  errorMessage: string = expectedTimeoutErrorMessage
+) {
+  return `Error occurred prerendering page "${pathname}". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: ${errorMessage}`
+}
