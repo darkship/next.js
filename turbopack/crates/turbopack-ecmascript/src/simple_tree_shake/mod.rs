@@ -25,15 +25,12 @@ pub async fn get_module_export_usages(
         return Ok(ModuleExportUsageInfo::all());
     };
 
-    Ok(ModuleExportUsageInfo {
-        exports: exports.clone(),
-    }
-    .cell())
+    Ok(**exports)
 }
 
 #[turbo_tasks::function(operation)]
 async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<ExportUsageInfo>> {
-    let mut result = ExportUsageInfo::default();
+    let mut used_exports = FxHashMap::<_, FxHashSet<ExportUsage>>::default();
 
     graph
         .await?
@@ -41,8 +38,7 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
             if let Some(target_module) =
                 ResolvedVc::try_downcast::<Box<dyn EcmascriptChunkPlaceable>>(target.module)
             {
-                result
-                    .used_exports
+                used_exports
                     .entry(target_module)
                     .or_default()
                     .insert(ref_data.export.clone());
@@ -53,13 +49,22 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
         .await
         .context("failed to traverse module graph")?;
 
+    let mut result = ExportUsageInfo::default();
+
+    for (module, exports) in used_exports {
+        result
+            .used_exports
+            .insert(module, ModuleExportUsageInfo { exports }.resolved_cell());
+    }
+
     Ok(result.cell())
 }
 
 #[turbo_tasks::value]
 #[derive(Default)]
 pub struct ExportUsageInfo {
-    used_exports: FxHashMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, Vc<ModuleExportUsageInfo>,
+    used_exports:
+        FxHashMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, ResolvedVc<ModuleExportUsageInfo>>,
 }
 
 #[turbo_tasks::value]
