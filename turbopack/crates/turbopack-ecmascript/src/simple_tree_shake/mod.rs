@@ -1,7 +1,7 @@
 //! Intermediate tree shaking that uses global information but not good as the full tree shaking.
 
 use anyhow::{Context, Result};
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use auto_hash_map::{AutoMap, AutoSet};
 use turbo_rcstr::RcStr;
 use turbo_tasks::{ResolvedVc, Vc};
 use turbopack_core::{module_graph::ModuleGraph, resolve::ExportUsage};
@@ -30,7 +30,7 @@ pub async fn get_module_export_usages(
 
 #[turbo_tasks::function(operation)]
 async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<ExportUsageInfo>> {
-    let mut used_exports = FxHashMap::<_, FxHashSet<ExportUsage>>::default();
+    let mut used_exports = AutoMap::<_, AutoSet<ExportUsage>>::default();
 
     graph
         .await?
@@ -64,12 +64,12 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
 #[derive(Default)]
 pub struct ExportUsageInfo {
     used_exports:
-        FxHashMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, ResolvedVc<ModuleExportUsageInfo>>,
+        AutoMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, ResolvedVc<ModuleExportUsageInfo>>,
 }
 
 #[turbo_tasks::value]
 pub struct ModuleExportUsageInfo {
-    exports: FxHashSet<ExportUsage>,
+    exports: AutoSet<ExportUsage>,
 }
 
 impl ModuleExportUsageInfo {
@@ -83,7 +83,7 @@ impl ModuleExportUsageInfo {
 impl ModuleExportUsageInfo {
     #[turbo_tasks::function]
     pub fn all() -> Vc<Self> {
-        let mut exports = FxHashSet::with_capacity_and_hasher(1, FxBuildHasher);
+        let mut exports = AutoSet::with_capacity(1);
         exports.insert(ExportUsage::All);
 
         Self { exports }.cell()
