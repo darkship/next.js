@@ -23,15 +23,15 @@ pub async fn get_module_export_usages(
     let Some(exports) = export_usage_info.used_exports.get(&module) else {
         // We exclude template files from tree shaking because they are entrypoints to the module
         // graph.
-        return Ok(ModuleExportUsageInfo::all());
+        return Ok(ModuleExportUsageInfo::All.cell());
     };
 
-    Ok(**exports)
+    Ok(exports.clone().cell())
 }
 
 #[turbo_tasks::function(operation)]
 async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<ExportUsageInfo>> {
-    let mut used_exports = FxHashMap::<_, AutoSet<ExportUsage>>::default();
+    let mut used_exports = FxHashMap::<_, ModuleExportUsageInfo>::default();
 
     graph
         .await?
@@ -39,10 +39,11 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
             if let Some(target_module) =
                 ResolvedVc::try_downcast::<Box<dyn EcmascriptChunkPlaceable>>(target.module)
             {
-                used_exports
-                    .entry(target_module)
-                    .or_default()
-                    .insert(ref_data.export.clone());
+                let e = used_exports.entry(target_module).or_default();
+
+                for export in ref_data.exports.iter() {
+                    e.add(export);
+                }
             }
 
             Ok(())
@@ -50,21 +51,7 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
         .await
         .context("failed to traverse module graph")?;
 
-    let mut result = ExportUsageInfo::default();
-
-    for (module, exports) in used_exports {
-        if exports.contains(&ExportUsage::All) {
-            result
-                .used_exports
-                .insert(module, ModuleExportUsageInfo::all().to_resolved().await?);
-        } else {
-            result
-                .used_exports
-                .insert(module, ModuleExportUsageInfo { exports }.resolved_cell());
-        }
-    }
-
-    Ok(result.cell())
+    Ok(ExportUsageInfo { used_exports }.cell())
 }
 
 #[turbo_tasks::value]
@@ -74,7 +61,7 @@ pub struct ExportUsageInfo {
 }
 
 #[turbo_tasks::value]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum ModuleExportUsageInfo {
     All,
     #[default]
@@ -83,8 +70,33 @@ pub enum ModuleExportUsageInfo {
 }
 
 impl ModuleExportUsageInfo {
-    pub fn is_export_used(&self, export_name: RcStr) -> bool {
-        self.exports.contains(&ExportUsage::All)
-            || self.exports.contains(&ExportUsage::Named(export_name))
+    fn add(&mut self, usage: &ExportUsage) {
+        match (&mut *self, usage) {
+            (Self::All, _) => {}
+            (_, ExportUsage::All) => {
+                *self = Self::All;
+            }
+            (Self::Evaluation, ExportUsage::Named(name)) => {
+                // Promote evaluation to something more specific
+                *self = Self::Exports(AutoSet::from_iter([name.clone()]));
+            }
+
+            (Self::Exports(l), ExportUsage::Named(r)) => {
+                // Merge exports
+                l.insert(r.clone());
+            }
+
+            (_, ExportUsage::Evaluation) => {
+                // Ignore evaluation
+            }
+        }
+    }
+
+    pub fn is_export_used(&self, export: &RcStr) -> bool {
+        match self {
+            Self::All => true,
+            Self::Evaluation => false,
+            Self::Exports(exports) => exports.contains(export),
+        }
     }
 }
