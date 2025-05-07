@@ -75,8 +75,11 @@ pub struct ExportUsageInfo {
 }
 
 #[turbo_tasks::value]
-pub struct ModuleExportUsageInfo {
-    exports: AutoSet<ExportUsage>,
+pub enum ModuleExportUsageInfo {
+    All,
+    #[default]
+    Evaluation,
+    Exports(AutoSet<RcStr>),
 }
 
 impl ModuleExportUsageInfo {
