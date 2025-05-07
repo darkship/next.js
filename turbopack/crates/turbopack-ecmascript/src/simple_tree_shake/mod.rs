@@ -71,7 +71,7 @@ async fn compute_export_usage_info(graph: ResolvedVc<ModuleGraph>) -> Result<Vc<
 #[derive(Default)]
 pub struct ExportUsageInfo {
     used_exports:
-        FxHashMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, ResolvedVc<ModuleExportUsageInfo>>,
+        FxHashMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>, ModuleExportUsageInfo>,
 }
 
 #[turbo_tasks::value]
