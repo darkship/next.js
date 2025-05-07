@@ -415,20 +415,9 @@ async function generateCacheEntryImpl(
     // If we're prerendering, we give you 50 seconds to fill a cache entry.
     // Otherwise we assume you stalled on hanging input and de-opt. This needs
     // to be lower than just the general timeout of 60 seconds.
-    let timer: NodeJS.Timeout | null = setTimeout(() => {
+    const timer: NodeJS.Timeout | null = setTimeout(() => {
       timeoutAbortController.abort(timeoutError)
     }, 50000)
-
-    const clearPrerenderTimeout = () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-    }
-
-    dynamicAccessAbortSignal?.addEventListener('abort', clearPrerenderTimeout, {
-      once: true,
-    })
 
     const abortSignal = dynamicAccessAbortSignal
       ? AbortSignal.any([
@@ -459,7 +448,7 @@ async function generateCacheEntryImpl(
       }
     )
 
-    clearPrerenderTimeout()
+    clearTimeout(timer)
 
     // When the prerender is aborted for any reason (including the timeout), and
     // we're prerendering a static shell that is allowed to be empty, we return
