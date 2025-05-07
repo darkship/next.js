@@ -1304,13 +1304,11 @@ enum SingleModuleGraphBuilderNode {
         module: ResolvedVc<Box<dyn Module>>,
         layer: Option<ReadRef<RcStr>>,
         ident: ReadRef<RcStr>,
-        export: ExportUsage,
     },
     /// A reference to a module that is already listed in visited_modules
     VisitedModule {
         module: ResolvedVc<Box<dyn Module>>,
         idx: GraphNodeIndex,
-        export: ExportUsage,
     },
     /// Issues to be added to the parent Module node
     #[allow(dead_code)]
