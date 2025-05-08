@@ -24,6 +24,7 @@ use crate::{
         analyse_ecmascript_module, esm::FoundExportType, follow_reexports, FollowExportsResult,
     },
     side_effect_optimization::facade::module::EcmascriptModuleFacadeModule,
+    simple_tree_shake::get_module_export_usages,
     tree_shake::{side_effect_module::SideEffectsModule, Key},
     AnalyzeEcmascriptModuleResult, EcmascriptAnalyzable, EcmascriptModuleAsset,
     EcmascriptModuleAssetType, EcmascriptModuleContent, EcmascriptModuleContentOptions,
@@ -96,6 +97,16 @@ impl EcmascriptAnalyzable for EcmascriptModulePartAsset {
             .reference_module_source_maps(Vc::upcast(self))
             .await?;
 
+        let export_usage_info = if module.full_module.options().await?.remove_unused_exports {
+            Some(
+                get_module_export_usages(*module_graph, Vc::upcast(*module.full_module))
+                    .to_resolved()
+                    .await?,
+            )
+        } else {
+            None
+        };
+
         Ok(EcmascriptModuleContentOptions {
             parsed,
             ident: self.ident().to_resolved().await?,
@@ -111,8 +122,7 @@ impl EcmascriptAnalyzable for EcmascriptModulePartAsset {
             original_source_map: analyze_ref.source_map,
             exports: analyze_ref.exports,
             async_module_info,
-            module: ResolvedVc::upcast(module.full_module),
-            remove_unused_exports: module.full_module.options().await?.remove_unused_exports,
+            export_usage_info,
         }
         .cell())
     }

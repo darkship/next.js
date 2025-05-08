@@ -101,6 +101,7 @@ use crate::{
         analyse_ecmascript_module, async_module::OptionAsyncModule, esm::base::EsmAssetReferences,
     },
     side_effect_optimization::reference::EcmascriptModulePartReference,
+    simple_tree_shake::{get_module_export_usages, ModuleExportUsageInfo},
     swc_comments::ImmutableComments,
     transform::remove_shebang,
 };
@@ -447,6 +448,16 @@ impl EcmascriptAnalyzable for EcmascriptModuleAsset {
             .reference_module_source_maps(Vc::upcast(*self))
             .await?;
 
+        let export_usage_info = if self.options().await?.remove_unused_exports {
+            Some(
+                get_module_export_usages(*module_graph, Vc::upcast(*self))
+                    .to_resolved()
+                    .await?,
+            )
+        } else {
+            None
+        };
+
         Ok(EcmascriptModuleContentOptions {
             parsed,
             ident: self.ident().to_resolved().await?,
@@ -462,8 +473,7 @@ impl EcmascriptAnalyzable for EcmascriptModuleAsset {
             original_source_map: analyze_ref.source_map,
             exports: analyze_ref.exports,
             async_module_info,
-            module: ResolvedVc::upcast(self),
-            remove_unused_exports: self.options().await?.remove_unused_exports,
+            export_usage_info,
         }
         .cell())
     }
@@ -813,7 +823,6 @@ pub struct EcmascriptModuleContent {
 #[turbo_tasks::value(shared)]
 #[derive(Clone, Debug, Hash, TaskInput)]
 pub struct EcmascriptModuleContentOptions {
-    module: ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>,
     parsed: ResolvedVc<ParseResult>,
     ident: ResolvedVc<AssetIdent>,
     specified_module_type: SpecifiedModuleType,
@@ -828,13 +837,12 @@ pub struct EcmascriptModuleContentOptions {
     original_source_map: Option<ResolvedVc<Box<dyn GenerateSourceMap>>>,
     exports: ResolvedVc<EcmascriptExports>,
     async_module_info: Option<ResolvedVc<AsyncModuleInfo>>,
-    remove_unused_exports: bool,
+    export_usage_info: Option<ResolvedVc<ModuleExportUsageInfo>>,
 }
 
 impl EcmascriptModuleContentOptions {
     async fn merged_code_gens(&self) -> Result<Vec<CodeGeneration>> {
         let EcmascriptModuleContentOptions {
-            module,
             parsed,
             module_graph,
             chunking_context,
@@ -845,7 +853,7 @@ impl EcmascriptModuleContentOptions {
             async_module,
             exports,
             async_module_info,
-            remove_unused_exports,
+            export_usage_info,
             ..
         } = self;
 
@@ -867,13 +875,7 @@ impl EcmascriptModuleContentOptions {
                 if let EcmascriptExports::EsmExports(exports) = *exports.await? {
                     Some(
                         exports
-                            .code_generation(
-                                **module_graph,
-                                **chunking_context,
-                                **module,
-                                Some(**parsed),
-                                *remove_unused_exports,
-                            )
+                            .code_generation(**chunking_context, Some(**parsed), *export_usage_info)
                             .await?,
                     )
                 } else {

@@ -23,6 +23,7 @@ use crate::{
         esm::{base::EsmAssetReferences, EsmExport, EsmExports},
     },
     side_effect_optimization::reference::EcmascriptModulePartReference,
+    simple_tree_shake::get_module_export_usages,
     AnalyzeEcmascriptModuleResult, EcmascriptAnalyzable, EcmascriptModuleContent,
     EcmascriptModuleContentOptions, EcmascriptOptions, SpecifiedModuleType,
 };
@@ -242,6 +243,16 @@ impl EcmascriptAnalyzable for EcmascriptModuleFacadeModule {
     ) -> Result<Vc<EcmascriptModuleContentOptions>> {
         let (esm_references, part_references) = self.await?.specific_references().await?;
 
+        let export_usage_info = if self.options().await?.remove_unused_exports {
+            Some(
+                get_module_export_usages(*module_graph, Vc::upcast(*self))
+                    .to_resolved()
+                    .await?,
+            )
+        } else {
+            None
+        };
+
         Ok(EcmascriptModuleContentOptions {
             parsed: ParseResult::empty().to_resolved().await?,
             ident: self.ident().to_resolved().await?,
@@ -257,8 +268,7 @@ impl EcmascriptAnalyzable for EcmascriptModuleFacadeModule {
             original_source_map: None,
             exports: self.get_exports().to_resolved().await?,
             async_module_info,
-            module: ResolvedVc::upcast(self),
-            remove_unused_exports: self.options().await?.remove_unused_exports,
+            export_usage_info,
         }
         .cell())
     }
