@@ -184,7 +184,6 @@ pub struct SingleModuleGraph {
 
 #[derive(
     Debug,
-    Default,
     Clone,
     Hash,
     TraceRawVcs,
@@ -1475,7 +1474,7 @@ impl Visit<(SingleModuleGraphBuilderNode, ExportUsage)> for SingleModuleGraphBui
                 source_ident,
                 target_ident,
                 ..
-            } => match chunking_type {
+            } => match &ref_data.chunking_type {
                 ChunkingType::Parallel {
                     inherit_async: false,
                     ..

@@ -302,7 +302,7 @@ impl PreBatches {
                             inherit_async: false,
                             hoisted: false,
                         },
-                        |(_, ty)| ty,
+                        |(_, ty)| &ty.chunking_type,
                     );
                     let module = node.module;
                     if !ty.is_parallel() {

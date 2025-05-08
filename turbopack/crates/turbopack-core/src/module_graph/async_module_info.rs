@@ -85,7 +85,7 @@ async fn compute_async_module_info_single(
             let module = module.module();
             let parent_module = parent_module.module;
 
-            if chunking_type.is_inherit_async() && async_modules.contains(&module) {
+            if ref_data.chunking_type.is_inherit_async() && async_modules.contains(&module) {
                 async_modules.insert(parent_module);
             }
         },
